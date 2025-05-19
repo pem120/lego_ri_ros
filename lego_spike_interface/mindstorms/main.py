@@ -7,7 +7,9 @@ Once per loop it accepts input from STDIN for processing
 """
 
 import hub
-
+from projects.mpy_robot_tools.serialtalk import *
+from projects.mpy_robot_tools.serialtalk.mshub import MSHubSerial
+st =SerialTalk(hub.USB_VCP(0))
 running_pattern = [
     9,0,7,0,5,
     0,0,8,0,6,
@@ -231,13 +233,13 @@ def move_motors(goal, errs=[]):
         else:
             errs.append('unknown motor name: {0}'.format(name))
 
-def read_cmd():
-    data = port.readline()
-    if data is not None:
-        data = data.decode('utf-8')
-    else:
-        data = ''
-    return data
+#def read_cmd():
+#    data = port.readline()
+#    if data is not None:
+#        data = data.decode('utf-8')
+#    else:
+#        data = ''
+#    return data
 
 def run_cmds(cmdstr):
     errs = []
@@ -262,21 +264,32 @@ def run_cmds(cmdstr):
 ## MAIN
 ################################################################################
 
-port = hub.USB_VCP(0)
+
+global data
 devices = enumerate_devices()
 
 set_led_pattern(running_pattern)
-while True:
-    cmd = read_cmd()
+def send_cmd(cmd: str):
     errs = []
     if len(cmd) > 0:
         errs = run_cmds(cmd)
-
+def send_data():
     data = {
         'imu': read_gyro(),
         'temperature': read_temperature(),
         'devices': read_devices(),
         'err': errs
     }
+    return data
+st.add_command(read_cmd)
+st.add_commad(send_data,'repr')
+while True:
+    try:
+        st.process_uart()
+        
+    except KeyboardInterrupt:
+        st.enable_repl_locally()
+        raise
+    except: # The show must go on
+        st.flush()
 
-    print(data)

@@ -10,6 +10,7 @@ The interface operates at 115200 baud 8N1 on the port specified.
 
 import serial
 import rospy
+from serialtalk.auto import *
 
 from lego_spike_msgs.msg import Color
 from lego_spike_msgs.msg import ColorSensors
@@ -20,6 +21,7 @@ from sensor_msgs.msg import ChannelFloat32
 from sensor_msgs.msg import Imu
 from sensor_msgs.msg import JointState
 from sensor_msgs.msg import PointCloud
+import serialtalk.py3
 from std_msgs.msg import Header
 from std_msgs.msg import Float32
 
@@ -229,22 +231,24 @@ class LegoInterface:
         self.command_queue.append(CommandList.ACTION_LIGHTS, pattern.pattern)
 
 
-class SerialInterface(LegoInterface):
+class SerialTalkInterface(LegoInterface):
     """Handles bidirectional communication over the USB virtual com port of the Lego Hub"""
     def __init__(self, port="/dev/lego", baud=115200, verbose=False):
         super().__init__()
         self.verbose = verbose
-
-        self.port = serial.Serial(
-            port=port,
-            baudrate=baud,
-            bytesize=serial.EIGHTBITS,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=1
-        )
+        self.st = SerialTalk()
+        
+        #self.port = serial.Serial(
+        #    port=port,
+        #    baudrate=baud,
+        #    bytesize=serial.EIGHTBITS,
+        #    parity=serial.PARITY_NONE,
+        #   stopbits=serial.STOPBITS_ONE,
+        #   timeout=1
+        #)
 
     def open(self):
+        '''
         if self.port.isOpen():
             rospy.logdebug("port is already open")
             return
@@ -252,8 +256,10 @@ class SerialInterface(LegoInterface):
             self.port.open()
         except serial.SerialException as err:
             rospy.logerr(err)
-
+        '''
+        pass
     def close(self):
+        '''
         if not self.port.isOpen():
             rospy.logdebug("port is already closed")
             return
@@ -261,24 +267,35 @@ class SerialInterface(LegoInterface):
             self.port.close()
         except Exception as err:
             rospy.logerr(err)
+        '''
+        pass
 
     def read_line(self):
         'Reads a single line of text from the micropython interpreter'
+        '''
         l = self.port.readline()
         l = l.decode('utf-8').rstrip()
         if self.verbose:
             rospy.loginfo(l)
         return l
-
+        '''
+        data = self.st.call("send_data")
+        if self.verbose:
+            print(data)
+        return data
+        
     def write_line(self, txt):
         'Writes a single line of text with newline terminator to the micropython interpreter'
+        '''
         data = bytes(txt, encoding='utf-8')
         self.port.write(data)
+        '''
+        self.st.call("send_cmd",txt)
 
     def write_byte(self, ch):
         'Writes a single character to the micropython interpreter'
-        self.port.write(ch)
+        self.st.call("send_cmd",ch)
 
-    def send_main(self):
-        path = catkin_find(project='lego_spike_interface', first_match_only=True, path='mindstorms/main.py')[0]
-        super().send_main(path=path)
+    #def send_main(self):
+    #    path = catkin_find(project='lego_spike_interface', first_match_only=True, path='mindstorms/main.py')[0]
+    #    super().send_main(path=path)
