@@ -1,14 +1,10 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.25.0)
 project(lego_spike_viz)
 
-find_package(catkin REQUIRED)
+find_package(ament_cmake REQUIRED)
 
-catkin_package(
+install(DIRECTORY launch rviz
+  DESTINATION share/${PROJECT_NAME}
 )
 
-include_directories(
-)
-
-install(DIRECTORY config meshes urdf
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
+ament_package()

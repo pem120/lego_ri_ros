@@ -1,20 +1,10 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.25.0)
 project(lego_spike_description)
 
-find_package(catkin REQUIRED)
+find_package(ament_cmake REQUIRED)
 
-catkin_package(
+install(DIRECTORY instructions launch meshes urdf
+  DESTINATION share/${PROJECT_NAME}
 )
 
-include_directories(
-)
-
-install(DIRECTORY config meshes urdf
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
-
-install(FILES
-  scripts/env_run
-  scripts/env_run.bat
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+ament_package()

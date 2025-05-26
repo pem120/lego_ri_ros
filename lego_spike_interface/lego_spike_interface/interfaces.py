@@ -8,8 +8,12 @@ hub.
 The interface operates at 115200 baud 8N1 on the port specified.
 """
 
+import argparse
+from math import pi
+import os
 import serial
-import rospy
+
+from lego_spike_interface.command import CommandList
 
 from lego_spike_msgs.msg import Color
 from lego_spike_msgs.msg import ColorSensors
@@ -23,43 +27,53 @@ from sensor_msgs.msg import PointCloud
 from std_msgs.msg import Header
 from std_msgs.msg import Float32
 
-from lego_spike_interface.command import CommandList
+from ament_index_python.packages import get_package_share_directory
 
-from math import pi
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 
-from catkin.find_in_workspaces import find_in_workspaces as catkin_find
 
 ctrl_c = b"\x03"
 ctrl_e = b"\x05"
 ctrl_d = b"\x04"
 
-def goal_pos_callback(data, interface):
-    interface.set_goal_positions(data)
 
-def light_pattern_callback(data, interface):
-    interface.set_lights(data)
-
-class LegoInterface:
+class LegoInterfaceNode(Node):
     def __init__(self):
+        super().__init__('lego_spike_interface_node')
+
         # TODO parameterize all these
         self.imu_frame_id = 'lego_hub_imu_link'
 
-        self.imu_pub = rospy.Publisher('imu/data', Imu, queue_size=1)
-        self.temperature_pub = rospy.Publisher('temperature', Float32, queue_size=1)
-        self.joint_state_pub = rospy.Publisher('joint_states', JointState, queue_size=1)
-        self.color_sensors_pub = rospy.Publisher('colors', ColorSensors, queue_size=1)
-        self.distance_sensors_pub = rospy.Publisher('distance', DistanceSensors, queue_size=1)
+        self.imu_pub = self.create_publisher(Imu, 'imu/data', qos_profile_sensor_data)
+        self.temperature_pub = self.create_publisher(Float32, 'temperature', qos_profile_sensor_data)
+        self.joint_state_pub = self.create_publisher(JointState, 'joint_states', qos_profile_sensor_data)
+        self.color_sensors_pub = self.create_publisher(ColorSensors, 'colors', qos_profile_sensor_data)
+        self.distance_sensors_pub = self.create_publisher(DistanceSensors, 'distance', qos_profile_sensor_data)
 
-        self.goal_pos_sub = rospy.Subscriber('cmd/goal_position', JointState, goal_pos_callback, self)
-        self.light_pattern_sub = rospy.Subscriber('cmd/lights', LightPattern, light_pattern_callback, self)
+        self.goal_pos_sub = self.create_subscription(JointState, 'cmd/goal_position',self.goal_pos_callback, qos_profile_sensor_data)
+        self.light_pattern_sub = self.create_subscriber(LightPattern, 'cmd/lights', self.cmd_lights_callback, qos_profile_sensor_data)
 
         self.command_queue = CommandList()
+
+    def goal_pos_callback(self, joint_goal_state):
+        param = {
+            'name': list(joint_goal_state.name),
+            'position': list(joint_goal_state.position),
+            'velocity': list(joint_goal_state.velocity),
+            'effort': list(joint_goal_state.effort)
+        }
+        self.command_queue.append(CommandList.ACTION_MOTORS, param)
+
+    def cmd_lights_callback(self, pattern):
+        self.command_queue.append(CommandList.ACTION_LIGHTS, pattern.pattern)
 
     def send_main(self, path=None):
         "Sends main.py to the Lego Hub so it can communicate bidirectionally"
 
         # to avoid serial corruption in paste-mode send the data one line at a time at 50 Hz
-        rate = rospy.Rate(50)
+        rate = self.create_rate(50)
 
         # cancel whatever's running first!
         for i in range(3):
@@ -67,21 +81,21 @@ class LegoInterface:
             rate.sleep()
 
         # skip past all the cruft during startup & the initial interpreter lines
-        rospy.loginfo("Reading past boot messages...")
+        self.get_logger().info("Reading past boot messages...")
         l = self.read_line()
         while not l.startswith('>>>'):
             l = self.read_line()
-            rospy.logdebug(l)
-        rospy.loginfo("Reading past boot interpreter prompt...")
+            self.get_logger().debug(l)
+        self.get_logger().info("Reading past boot interpreter prompt...")
         while l.startswith('>>>'):
             l = self.read_line()
-            rospy.logdebug(l)
+            self.get_logger().debug(l)
 
-        rospy.loginfo('Sending Lego Hub main at {0}'.format(path))
+        self.get_logger().info('Sending Lego Hub main at {0}'.format(path))
         file_in = open(path, 'r')
         lines = file_in.readlines()
         file_in.close()
-        rospy.loginfo("Entering paste mode...")
+        self.get_logger().info("Entering paste mode...")
         self.write_byte(ctrl_e)
         l = self.read_line()
         while len(l.strip()) > 0:
@@ -91,17 +105,17 @@ class LegoInterface:
             # don't send empty lines
             check_l = l.rstrip()
             if len(check_l) > 0:
-                rospy.logdebug(check_l)
+                self.get_logger().debug(check_l)
                 self.write_line(l)
                 self.read_line()
                 rate.sleep()
         self.read_line()
 
-        rospy.loginfo("Exiting paste mode...")
+        self.get_logger().info("Exiting paste mode...")
         self.write_byte(ctrl_d)
         self.read_line()
 
-        rospy.loginfo("Lego Hub main sent!")
+        self.get_logger().info("Lego Hub main sent!")
 
 
     def run(self):
@@ -109,15 +123,15 @@ class LegoInterface:
 
         # our main sensor-reading loop runs at 10Hz
         # TODO: can we go faster?
-        rate = rospy.Rate(50)
+        rate = self.create_rate(50)
 
-        while not rospy.is_shutdown():
+        while rclpy.ok():
             datastr = self.read_line()
             try:
                 data = eval(datastr)
                 if len(data['err']) > 0:
                     for e in data['err']:
-                        rospy.logerr('Error in response from hub: {0}'.format(e))
+                        self.get_logger().error('Error in response from hub: {0}'.format(e))
 
                 self.send_ros_msgs(data)
 
@@ -125,7 +139,7 @@ class LegoInterface:
                     self.command_queue.transmit(self)
 
             except Exception as err:
-                rospy.logerr(err)
+                self.get_logger().error(err)
             rate.sleep()
 
         # cancel when we're done
@@ -134,7 +148,7 @@ class LegoInterface:
     def send_ros_msgs(self, data):
         "Publish the ROS messages"
         hdr = Header()
-        hdr.stamp = rospy.Time.now()
+        hdr.stamp = self.get_clock().now().to_msg()
         hdr.frame_id = self.imu_frame_id
         imu_msg = Imu()
         imu_msg.header = hdr
@@ -149,7 +163,7 @@ class LegoInterface:
         temperature_msg.data = data['temperature']
 
         hdr = Header()
-        hdr.stamp = rospy.Time.now()
+        hdr.stamp = self.get_clock().now().to_msg()
         js = JointState()
         js.header = hdr
         js.name = []
@@ -177,7 +191,7 @@ class LegoInterface:
                 clr.data.append(c)
             elif device['type'] == 'distance':
                 h = Header()
-                h.stamp = rospy.Time.now()
+                h.stamp = self.get_clock().now().to_msg()
                 h.frame_id = 'distance_{0}'.format(device['port'])
                 pc = PointCloud()
                 pc.header = h
@@ -202,34 +216,22 @@ class LegoInterface:
         self.distance_sensors_pub.publish(dst)
 
     def open(self):
-        rospy.logerr("Not implented by this class")
+        self.get_logger().error("Not implented by this class")
 
     def close(self):
-        rospy.logerr("Not implented by this class")
+        self.get_logger().error("Not implented by this class")
 
     def read_line(self):
-        rospy.logerr("Not implented by this class")
+        self.get_logger().error("Not implented by this class")
 
     def write_line(self, txt):
-        rospy.logerr("Not implented by this class")
+        self.get_logger().error("Not implented by this class")
 
     def write_byte(self, ch):
-        rospy.logerr("Not implented by this class")
-
-    def set_goal_positions(self, js):
-        param = {
-            'name': list(js.name),
-            'position': list(js.position),
-            'velocity': list(js.velocity),
-            'effort': list(js.effort)
-        }
-        self.command_queue.append(CommandList.ACTION_MOTORS, param)
-
-    def set_lights(self, pattern):
-        self.command_queue.append(CommandList.ACTION_LIGHTS, pattern.pattern)
+        self.get_logger().error("Not implented by this class")
 
 
-class SerialInterface(LegoInterface):
+class SerialInterfaceNode(LegoInterfaceNode):
     """Handles bidirectional communication over the USB virtual com port of the Lego Hub"""
     def __init__(self, port="/dev/lego", baud=115200, verbose=False):
         super().__init__()
@@ -246,28 +248,28 @@ class SerialInterface(LegoInterface):
 
     def open(self):
         if self.port.isOpen():
-            rospy.logdebug("port is already open")
+            self.get_logger().debug("port is already open")
             return
         try:
             self.port.open()
         except serial.SerialException as err:
-            rospy.logerr(err)
+            self.get_logger().error(err)
 
     def close(self):
         if not self.port.isOpen():
-            rospy.logdebug("port is already closed")
+            self.get_logger().debug("port is already closed")
             return
         try:
             self.port.close()
         except Exception as err:
-            rospy.logerr(err)
+            self.get_logger().error(err)
 
     def read_line(self):
         'Reads a single line of text from the micropython interpreter'
         l = self.port.readline()
         l = l.decode('utf-8').rstrip()
         if self.verbose:
-            rospy.loginfo(l)
+            self.get_logger().info(l)
         return l
 
     def write_line(self, txt):
@@ -280,5 +282,21 @@ class SerialInterface(LegoInterface):
         self.port.write(ch)
 
     def send_main(self):
-        path = catkin_find(project='lego_spike_interface', first_match_only=True, path='mindstorms/main.py')[0]
+        path = os.path.join(get_package_share_directory('lego_spike_interface'), 'mindstorms', 'main.py')
         super().send_main(path=path)
+
+
+def main():
+    parser = argparse.ArgumentParser('Serial interface for Lego Mindstorms and Lego Spike Prime hub')
+    parser.add_argument("-p", "--port", metavar="TTY", type=str, default="/dev/lego", dest='port', help="Serial port to open (default /dev/lego)")
+    parser.add_argument("-b", "--baud", metavar="INT", type=int, default=115200, dest='baud', help="Serial port to open (default /dev/lego)")
+    parser.add_argument("-v", "--verbose", action='store_true', dest='verbose', help="Show all serial I/O from the hub")
+    args, unk_args = parser.parse_known_args()
+
+    rclpy.init()
+    node = SerialInterfaceNode(port=args.port, baud=args.baud, verbose=args.verbose)
+    node.open()
+    node.send_main()
+    rclpy.spin(node)
+    node.close()
+    rclpy.shutdown()

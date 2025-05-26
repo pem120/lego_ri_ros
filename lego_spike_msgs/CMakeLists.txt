@@ -1,17 +1,28 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.25.0)
 project(lego_spike_msgs)
 
-find_package(catkin REQUIRED COMPONENTS message_generation std_msgs sensor_msgs)
+# Default to C++14
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+endif()
 
-add_message_files(
-  FILES
-  Color.msg
-  ColorSensors.msg
-  DistanceSensors.msg
-  LightPattern.msg
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+find_package(ament_cmake REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  msg/Color.msg
+  msg/ColorSensors.msg
+  msg/DistanceSensors.msg
+  msg/LightPattern.msg
+  DEPENDENCIES sensor_msgs builtin_interfaces
 )
 
-generate_messages(
-DEPENDENCIES std_msgs sensor_msgs)
+ament_export_dependencies(rosidl_default_runtime)
 
-catkin_package()
+ament_package()

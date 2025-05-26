@@ -3,7 +3,6 @@
 Commands sent over the serial interface to the Lego hub
 """
 
-import rospy
 from threading import Lock
 
 class CommandList:
