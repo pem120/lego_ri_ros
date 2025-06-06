@@ -9,7 +9,7 @@ The interface operates at 115200 baud 8N1 on the port specified.
 """
 
 import serial
-import rospy
+import rclpy
 
 from lego_spike_msgs.msg import Color
 from lego_spike_msgs.msg import ColorSensors
