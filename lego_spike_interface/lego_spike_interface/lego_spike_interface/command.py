@@ -40,14 +40,13 @@ class CommandList:
 
     def transmit(self, interface):
         self.mutex.acquire()
-        if True:  # len(self) > 0:
+        if len(self) > 0:
             interface.write_line(str(self))
-            print(str(self))
             # clear, but we already have the lock!
             self.actions = []
             self.parameters = []
         else:
             interface.write_line(
-                ""
+                b"\n"
             )  # write an empty line so there's something to receive on the other end
         self.mutex.release()
