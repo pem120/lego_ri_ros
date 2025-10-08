@@ -9,12 +9,33 @@ Once per loop it accepts input from STDIN for processing
 import hub
 
 running_pattern = [
-    9,0,7,0,5,
-    0,0,8,0,6,
-    7,8,9,0,7,
-    0,0,0,0,8,
-    5,6,7,8,9
+    9,
+    0,
+    7,
+    0,
+    5,
+    0,
+    0,
+    8,
+    0,
+    6,
+    7,
+    8,
+    9,
+    0,
+    7,
+    0,
+    0,
+    0,
+    0,
+    8,
+    5,
+    6,
+    7,
+    8,
+    9,
 ]
+
 
 def set_led_pattern(pattern):
     for px in range(len(pattern)):
@@ -23,28 +44,30 @@ def set_led_pattern(pattern):
         gamma = pattern[px]
         hub.display.pixel(x, y, gamma)
 
+
 class Motor:
     def __init__(self, device, motor, data, port):
         self.__device = device
         self.__motor = motor
-        self.__type = 'motor'
+        self.__type = "motor"
         self.__port = port
 
         self.__motor.float()
 
     def recalibrate_zero(self):
         "The zero position is calculated based on the angle when the motor powers-on. Recalculate so zero is actually zero"
-        speed_percent, net_encoder_pos, angle_degrees, speed_deg_per_s = self.__motor.get()
+        speed_percent, net_encoder_pos, angle_degrees, speed_deg_per_s = (
+            self.__motor.get()
+        )
 
     def get(self):
-        speed_percent, net_encoder_pos, angle_degrees, speed_deg_per_s = self.__device.get()
+        speed_percent, net_encoder_pos, angle_degrees, speed_deg_per_s = (
+            self.__device.get()
+        )
 
         angle_rad = angle_degrees * pi / 180.0
 
-        return {
-            'position': -angle_rad,
-            'speed'   : -speed_percent / 100.0
-        }
+        return {"position": -angle_rad, "speed": -speed_percent / 100.0}
 
     def process_joint_state(self, position, velocity, effort):
         "Handle the values from a ROS JointState message"
@@ -81,7 +104,9 @@ class Motor:
             percent = -100
         elif percent > 100:
             percent = 100
-        self.__motor.run_at_speed(-percent)  # Lego and ROS use opposite rotational directions!
+        self.__motor.run_at_speed(
+            -percent
+        )  # Lego and ROS use opposite rotational directions!
 
     def float(self):
         self.__motor.float()
@@ -93,25 +118,21 @@ class Motor:
 class LightSensor:
     def __init__(self, device, data, port):
         self.__device = device
-        self.__type='light'
+        self.__type = "light"
         self.__port = port
 
     def get(self):
         brightness, idk_wtf_this_is_yet, r, g, b = self.__device.get()
         return {
-            'level': brightness,
-            'rgb': {
-                'r': r / 1024.0,
-                'g': g / 1024.0,
-                'b': b / 1024.0
-            }
+            "level": brightness,
+            "rgb": {"r": r / 1024.0, "g": g / 1024.0, "b": b / 1024.0},
         }
 
 
-class DistanceSensor        :
+class DistanceSensor:
     def __init__(self, device, data, port):
         self.__device = device
-        self.__type='distance'
+        self.__type = "distance"
         self.__port = port
 
     def get(self):
@@ -121,32 +142,26 @@ class DistanceSensor        :
         else:
             return raw_data[0] * 0.01  # base device returns cm, convert to m
 
+
 def enumerate_devices():
     ports = {
-        'A': hub.port.A.device,
-        'B': hub.port.B.device,
-        'C': hub.port.C.device,
-        'D': hub.port.D.device,
-        'E': hub.port.E.device,
-        'F': hub.port.F.device
+        "A": hub.port.A.device,
+        "B": hub.port.B.device,
+        "C": hub.port.C.device,
+        "D": hub.port.D.device,
+        "E": hub.port.E.device,
+        "F": hub.port.F.device,
     }
     motors = {
-        'A': hub.port.A.motor,
-        'B': hub.port.B.motor,
-        'C': hub.port.C.motor,
-        'D': hub.port.D.motor,
-        'E': hub.port.E.motor,
-        'F': hub.port.F.motor
+        "A": hub.port.A.motor,
+        "B": hub.port.B.motor,
+        "C": hub.port.C.motor,
+        "D": hub.port.D.motor,
+        "E": hub.port.E.motor,
+        "F": hub.port.F.motor,
     }
 
-    devices = {
-        'A': None,
-        'B': None,
-        'C': None,
-        'D': None,
-        'E': None,
-        'F': None
-    }
+    devices = {"A": None, "B": None, "C": None, "D": None, "E": None, "F": None}
 
     for p in ports.keys():
         if ports[p] is not None:
@@ -160,103 +175,106 @@ def enumerate_devices():
 
     return devices
 
+
 def read_devices():
     data = []
     for d in devices.keys():
         dev = devices[d]
         if dev is not None:
-            data.append({
-                'type': dev.__type,
-                'data': dev.get(),
-                'port': dev.__port
-            })
+            data.append({"type": dev.__type, "data": dev.get(), "port": dev.__port})
     return data
+
 
 def read_gyro():
     status = hub.status()
     return {
-        'angular': {
-            'x': status['gyroscope'][0],
-            'y': status['gyroscope'][1],
-            'z': status['gyroscope'][2]
+        "angular": {
+            "x": status["gyroscope"][0],
+            "y": status["gyroscope"][1],
+            "z": status["gyroscope"][2],
         },
-        'linear': {
+        "linear": {
             # reported in cm/s^2
-            'x': status['accelerometer'][0] / 100.0,
-            'y': status['accelerometer'][1] / 100.0,
-            'z': status['accelerometer'][2] / 100.0
-        }
+            "x": status["accelerometer"][0] / 100.0,
+            "y": status["accelerometer"][1] / 100.0,
+            "z": status["accelerometer"][2] / 100.0,
+        },
     }
+
 
 def read_temperature():
     return hub.temperature()
 
-def move_motors(goal, errs=[]):
-    for i in range(len(goal['name'])):
-        name = goal['name'][i]
-        position = goal['position'][i]
-        velocity = goal['velocity'][i]
-        effort = goal['effort'][i]
 
-        if name.startswith('motor_a'):
-            if devices['A'].__type == "motor":
-                devices['A'].process_joint_state(position, velocity, effort)
+def move_motors(goal, errs=[]):
+    for i in range(len(goal["name"])):
+        name = goal["name"][i]
+        position = goal["position"][i]
+        velocity = goal["velocity"][i]
+        effort = goal["effort"][i]
+
+        if name.startswith("motor_a"):
+            if devices["A"].__type == "motor":
+                devices["A"].process_joint_state(position, velocity, effort)
             else:
-                errs.append('no motor connected to port a')
-        elif name.startswith('motor_b'):
-            if devices['B'].__type == "motor":
-                devices['B'].process_joint_state(position, velocity, effort)
+                errs.append("no motor connected to port a")
+        elif name.startswith("motor_b"):
+            if devices["B"].__type == "motor":
+                devices["B"].process_joint_state(position, velocity, effort)
             else:
-                errs.append('no motor connected to port b')
-        elif name.startswith('motor_c'):
-            if devices['C'].__type == "motor":
-                devices['C'].process_joint_state(position, velocity, effort)
+                errs.append("no motor connected to port b")
+        elif name.startswith("motor_c"):
+            if devices["C"].__type == "motor":
+                devices["C"].process_joint_state(position, velocity, effort)
             else:
-                errs.append('no motor connected to port c')
-        elif name.startswith('motor_d'):
-            if devices['D'].__type == "motor":
-                devices['D'].process_joint_state(position, velocity, effort)
+                errs.append("no motor connected to port c")
+        elif name.startswith("motor_d"):
+            if devices["D"].__type == "motor":
+                devices["D"].process_joint_state(position, velocity, effort)
             else:
-                errs.append('no motor connected to port d')
-        elif name.startswith('motor_e'):
-            if devices['E'].__type == "motor":
-                devices['E'].process_joint_state(position, velocity, effort)
+                errs.append("no motor connected to port d")
+        elif name.startswith("motor_e"):
+            if devices["E"].__type == "motor":
+                devices["E"].process_joint_state(position, velocity, effort)
             else:
-                errs.append('no motor connected to port e')
-        elif name.startswith('motor_f'):
-            if devices['F'].__type == "motor":
-                devices['F'].process_joint_state(position, velocity, effort)
+                errs.append("no motor connected to port e")
+        elif name.startswith("motor_f"):
+            if devices["F"].__type == "motor":
+                devices["F"].process_joint_state(position, velocity, effort)
             else:
-                errs.append('no motor connected to port f')
+                errs.append("no motor connected to port f")
         else:
-            errs.append('unknown motor name: {0}'.format(name))
+            errs.append("unknown motor name: {0}".format(name))
+
 
 def read_cmd():
     data = port.readline()
     if data is not None:
-        data = data.decode('utf-8')
+        data = data.decode("utf-8")
     else:
-        data = ''
+        data = ""
     return data
+
 
 def run_cmds(cmdstr):
     errs = []
     try:
         cmds = eval(cmdstr)
-        if len(cmds['actions']) == len(cmds['parameters']):
-            for i in range(len(cmds['actions'])):
-                action = cmds['actions'][i]
-                param = cmds['parameters'][i]
+        if len(cmds["actions"]) == len(cmds["parameters"]):
+            for i in range(len(cmds["actions"])):
+                action = cmds["actions"][i]
+                param = cmds["parameters"][i]
 
-                if action == 'lights':
+                if action == "lights":
                     set_led_pattern(param)
-                elif action == 'motors':
+                elif action == "motors":
                     move_motors(param, errs)
         else:
-            errs.append('Action/Parameter length mismatch')
+            errs.append("Action/Parameter length mismatch")
     except Exception as e:
-        errs.append('Exception raised in run_cmds: {0}'.format(e))
+        errs.append("Exception raised in run_cmds: {0}".format(e))
     return errs
+
 
 ################################################################################
 ## MAIN
@@ -273,10 +291,10 @@ while True:
         errs = run_cmds(cmd)
 
     data = {
-        'imu': read_gyro(),
-        'temperature': read_temperature(),
-        'devices': read_devices(),
-        'err': errs
+        "imu": read_gyro(),
+        "temperature": read_temperature(),
+        "devices": read_devices(),
+        "err": errs,
     }
 
     print(data)
