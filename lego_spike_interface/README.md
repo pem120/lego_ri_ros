@@ -25,12 +25,14 @@ ROS Topics
 ------------
 
 The `SerialInterface` class reads the raw data as described above and publishes the data on the following topics:
+
 - `/colors` -- Color & light-level data from all connected light sensors
 - `/distance` -- Distance reported by all ultrasonic distance sensors
 - `/imu/data` -- Internal IMU gyroscope and accelerometer data
 - `/joint_states` -- Joint positions and velocities of all connected motors
 
 The following ROS topics are used for input:
+
 - `/cmd/goal_position` -- move the joints to the specified positions or at the specified speeds
 - `/cmd/lights` -- send a 25-item row-major array to be displayed on the LED grid. Values should be brightness levels 0-9
 
